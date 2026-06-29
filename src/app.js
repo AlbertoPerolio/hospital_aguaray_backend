@@ -7,7 +7,6 @@ import cookieParser from "cookie-parser";
 import config from "./config.js";
 
 // imp rutas
-import register from "../modules/register/routes.js";
 import auth from "../modules/auth/routes.js";
 import userManagement from "../modules/user/routes.js";
 import address from "../modules/address/routes.js";
@@ -32,7 +31,7 @@ await connect();
 const app = express();
 
 //config CORS
-const allowedOrigins = ["https://hospital-aguaray.vercel.app"];
+const allowedOrigins = ["http://localhost:5173"];
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -73,7 +72,6 @@ app.use((req, res, next) => {
 });
 
 //rutas
-app.use("/api/user", register);
 app.use("/api/auth", auth);
 app.use("/api/auth/google", googleAuth);
 

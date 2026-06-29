@@ -53,13 +53,8 @@ const turn = sequelize.define(
       defaultValue: "PENDIENTE",
     },
 
-    confirmedAt: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-
-    confirmedBy: {
-      // id_user del secretario que confirma
+    modifiedBy: {
+      // id_user del secretario que modifica (confirmar/cancelar)
       type: DataTypes.INTEGER,
       allowNull: true,
     },

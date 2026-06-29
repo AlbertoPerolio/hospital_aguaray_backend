@@ -16,7 +16,8 @@ function getTokenFromHeader(req) {
   return null;
 }
 
-// RUTA DE LOGIN
+// RUTA DE LOGIN (DESHABILITADA)
+// En esta práctica el inicio de sesión es SOLO con Google.
 import {
   authLoginRateLimiter,
   authResetPasswordRateLimiter,
@@ -27,48 +28,24 @@ router.post(
   authLoginRateLimiter,
   validateSchema(loginSchema),
   async (req, res) => {
-    try {
-      const token = await controller.login(req.body.user, req.body.password);
-      const decodedUser = jwt.verify(token, config.jwt.secret);
-      const isProduction = process.env.NODE_ENV === "production";
-
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
-        maxAge: 24 * 60 * 60 * 1000, // 1 día
-      });
-
-      // Solo enviar el usuario decodificado
-      res.json({
-        error: false,
-        body: { mensaje: "Login exitoso" },
-        user: decodedUser,
-      });
-    } catch (err) {
-      return res.status(err.statusCode || 500).json({
-        error: true,
-        body: { mensaje: err.message },
-      });
-    }
+    return res.status(403).json({
+      error: true,
+      body: { mensaje: "Esta app solo permite iniciar sesión con Google." },
+    });
   },
 );
+
 router.post(
   "/reset-password",
+  authResetPasswordRateLimiter,
   validateSchema(resetPasswordSchema),
   async (req, res) => {
-    try {
-      const result = await controller.resetPassword(req.body);
-      return res.status(200).json({
-        error: false,
-        body: result,
-      });
-    } catch (err) {
-      return res.status(err.statusCode || 500).json({
-        error: true,
-        body: { mensaje: err.message },
-      });
-    }
+    return res.status(403).json({
+      error: true,
+      body: {
+        mensaje: "Reset de contraseña deshabilitado. Iniciá sesión con Google.",
+      },
+    });
   },
 );
 

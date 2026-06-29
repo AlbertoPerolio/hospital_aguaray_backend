@@ -6,7 +6,7 @@ function sha256(value) {
   if (value === null || value === undefined) return null;
   return crypto
     .createHash("sha256")
-    .update(String(value).trim().toLowerCase())
+    .update(String(value).replace(/\D/g, "").trim())
     .digest("hex");
 }
 
@@ -40,6 +40,9 @@ export default function patientController() {
     const dni_sha256 = sha256(dni);
     const telefono_sha256 = sha256(telefono);
 
+    // Usamos dni_sha256/telefono_sha256 como clave determinística para encontrar/crear.
+    // También almacenamos los valores “limpios” (dni/telefono) en texto para mostrarlos en UI.
+
     const fields = {
       first_name: nombre || null,
       last_name: apellido || null,
@@ -47,20 +50,16 @@ export default function patientController() {
       createdBy: createdBy || null,
       dni_sha256,
       telefono_sha256,
-      // Guardamos el teléfono en texto para poder mostrarlo en UI.
-      // Nota: esto no se puede derivar desde hashes.
-      telefono: telefono ? String(telefono).trim() : null,
+      // Guardamos dni/telefono en texto plano (igual que en tabla user)
+      // y usamos los hashes SHA-256 para vincular de forma determinística.
+      telefono: telefono
+        ? String(telefono).toString().replace(/\D/g, "").trim()
+        : null,
+      dni: dni ? String(dni).toString().replace(/\D/g, "").trim() : null,
     };
 
-    if (dni) {
-      const salt = await bcrypt.genSalt(10);
-      fields.dni_hash = await bcrypt.hash(dni.toString(), salt);
-    }
-
-    if (telefono) {
-      const salt = await bcrypt.genSalt(10);
-      fields.telefono_hash = await bcrypt.hash(telefono.toString(), salt);
-    }
+    // Ya no guardamos dni_hash/telefono_hash (bcrypt) en presential_patient.
+    // Para vincular con la tabla user usamos únicamente dni_sha256/telefono_sha256.
 
     // Buscamos si ya existe el paciente por sus hashes determinísticos
     let existing = null;
@@ -74,7 +73,19 @@ export default function patientController() {
     }
 
     if (existing) {
-      await existing.update(fields);
+      // Si el paciente presencial ya existe por DNI/Teléfono, NO sobrescribimos
+      // nombre/apellido/nacionalidad. Esto evita que un "falso" con el mismo DNI
+      // reemplace la identidad mostrada en turnos ya existentes.
+      const safeFields = {
+        createdBy: createdBy || null,
+        dni_sha256,
+        telefono_sha256,
+        telefono: telefono
+          ? String(telefono).toString().replace(/\D/g, "").trim()
+          : null,
+      };
+
+      await existing.update(safeFields);
       return existing;
     }
 

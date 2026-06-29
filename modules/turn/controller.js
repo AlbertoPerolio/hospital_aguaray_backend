@@ -5,12 +5,14 @@ import User from "../../DB/models/user.js";
 import PresentialPatient from "../../DB/models/presential_patient.js";
 
 export default function turnController() {
-  async function countConfirmedForDoctorOnDate({ id_doctor, date }) {
+  async function countBookedForDoctorOnDate({ id_doctor, date }) {
+    // Límite debe respetar TODOS los turnos reservados en el día,
+    // incluyendo los que están en PENDIENTE (a confirmar) y CONFIRMADO.
     return await Turn.count({
       where: {
         id_doctor,
         date,
-        status: "CONFIRMADO",
+        status: ["PENDIENTE", "CONFIRMADO"],
       },
     });
   }
@@ -41,13 +43,15 @@ export default function turnController() {
       throw err;
     }
 
-    const confirmedCount = await countConfirmedForDoctorOnDate({
+    const bookedCount = await countBookedForDoctorOnDate({
       id_doctor,
       date,
     });
 
-    if (confirmedCount >= capacity.limit_turns) {
-      const err = new Error("Sin cupos disponibles para esa fecha");
+    if (bookedCount >= capacity.limit_turns) {
+      const err = new Error(
+        "Sin cupos disponibles, por favor intenta de nuevo mas tarde, tal vez se libere un turno",
+      );
       err.statusCode = 400;
       throw err;
     }
@@ -60,63 +64,96 @@ export default function turnController() {
       throw err;
     }
 
-    // Regla paciente: solo 1 turno activo (PENDIENTE o CONFIRMADO)
-    // - Si es usuario registrado: controlamos por id_user
-    // - Si es paciente presencial: controlamos por dni_sha256 (contra user) y también por id_patient_record
     {
-      let blockedUserId = null;
-      if (id_patient_record && !id_user) {
+      const hasPatientRecord = !!id_patient_record;
+
+      // Identidad "equivalente":
+      // - Si pide con usuario: usamos id_user
+      // - Si pide con paciente presencial: derivamos el id_user del usuario existente con el mismo dni_sha256
+      // Así evitamos que tras crear la cuenta con el mismo DNI pueda pedir como otro (otro id_user).
+      const derivedUserIds = new Set();
+
+      if (id_user) derivedUserIds.add(id_user);
+
+      if (id_patient_record) {
         const presential = await PresentialPatient.findByPk(id_patient_record);
+
+        // Vinculamos por dni_sha256 (NO por dni limpio ni por hash bcrypt)
         if (presential?.dni_sha256) {
           const u = await User.findOne({
             where: { dni_sha256: presential.dni_sha256 },
           });
-          blockedUserId = u ? u.id_user : null;
+          if (u?.id_user) derivedUserIds.add(u.id_user);
         }
       }
 
-      // Armamos consulta OR: mismo id_user (cuenta) o mismo id_patient_record (presencial)
-      // y si existe usuario por dni_sha256 del presencial, también bloqueamos por ese id_user.
-      const whereOr = [];
-      if (id_user) whereOr.push({ id_user });
-      if (id_patient_record) whereOr.push({ id_patient_record });
-      if (blockedUserId) whereOr.push({ id_user: blockedUserId });
+      const ids = Array.from(derivedUserIds).filter(Boolean);
 
-      if (whereOr.length > 0) {
-        // Evitamos usar Op.or porque en este proyecto Turn.sequelize.Op puede venir undefined.
-        // En su lugar, hacemos 2 consultas separadas (OR manual):
-        // - si ya hay turno activo por id_user
-        // - o si ya hay turno activo por id_patient_record
-        // - o por id_user "derivado" del dni_sha256 del paciente presencial
+      // Regla nueva:
+      // 1 turno por día por doctor (independiente por doctor).
+      // Bloqueamos si existe un turno PENDIENTE/CONFIRMADO para el MISMO
+      // doctor + MISMA fecha que pertenezca al mismo paciente.
+      // Para equivalencia:
+      // - si hay id_user derivado, usamos esos id_user
+      // - si hay id_patient_record, usamos ese id_patient_record
 
-        const existingByIdUser = whereOr.some((c) => c.id_user)
-          ? await Turn.findOne({
-              where: {
-                status: ["PENDIENTE", "CONFIRMADO"],
-                date,
-                id_user: whereOr.find((c) => c.id_user).id_user,
-              },
-            })
-          : null;
+      const { Op } = await import("sequelize");
 
-        const existingByPatientRecord = whereOr.some((c) => c.id_patient_record)
-          ? await Turn.findOne({
-              where: {
-                status: ["PENDIENTE", "CONFIRMADO"],
-                date,
-                id_patient_record: whereOr.find((c) => c.id_patient_record)
-                  .id_patient_record,
-              },
-            })
-          : null;
+      // Si el request llega ya con id_user (login con cuenta creada),
+      // pero el turno previo se guardó con id_patient_record (sin cuenta),
+      // entonces necesitamos derivar el id_patient_record desde el dni_sha256
+      // del user para poder detectar el conflicto.
+      let derivedPatientRecordIds = [];
+      if (ids.length) {
+        const u = await User.findOne({
+          where: { id_user: ids[0] },
+          attributes: ["id_user", "dni_sha256"],
+        });
 
-        if (existingByIdUser || existingByPatientRecord) {
-          const err = new Error(
-            "Ya tenés un turno pendiente o confirmado para esa fecha. No podés solicitar otro.",
-          );
-          err.statusCode = 400;
-          throw err;
+        if (u?.dni_sha256) {
+          const ps = await PresentialPatient.findAll({
+            where: { dni_sha256: u.dni_sha256 },
+            attributes: ["id_patient_record"],
+          });
+
+          derivedPatientRecordIds = ps
+            .map((p) => p.id_patient_record)
+            .filter(Boolean);
         }
+      }
+
+      const patientRecordIdsForConflict = Array.from(
+        new Set([
+          ...(hasPatientRecord ? [id_patient_record] : []),
+          ...derivedPatientRecordIds,
+        ]),
+      );
+
+      const conflict = await Turn.findOne({
+        where: {
+          status: ["PENDIENTE", "CONFIRMADO"],
+          date,
+          id_doctor,
+          [Op.or]: [
+            ...(ids.length ? [{ id_user: ids[0] }] : []),
+            ...(patientRecordIdsForConflict.length
+              ? [{ id_patient_record: patientRecordIdsForConflict[0] }]
+              : []),
+          ],
+        },
+      });
+
+      // Nota: la lógica de arriba usa ambos campos si existen; si el sistema
+      // guarda turnos pre-cuenta con id_user=NULL, entonces el conflicto no
+      // se va a encontrar por id_user y se va a encontrar por id_patient_record
+      // (cuando hasPatientRecord es true).
+
+      if (conflict) {
+        const err = new Error(
+          "Ya tenés un turno pendiente o confirmado para ese doctor y esa fecha. No podés solicitar otro.",
+        );
+        err.statusCode = 400;
+        throw err;
       }
     }
 
@@ -131,8 +168,46 @@ export default function turnController() {
   }
 
   async function myTurns(id_user) {
+    // Mostrar turnos del usuario, incluyendo los que se hayan creado como
+    // paciente presencial (id_patient_record) antes de que el usuario existiera.
+
+    const numericIdUser = Number(id_user);
+
+    // 1) Obtenemos el dni_sha256 del usuario autenticado
+    const u = await User.findOne({
+      where: { id_user: numericIdUser },
+      attributes: ["id_user", "dni_sha256"],
+    });
+
+    if (!u?.dni_sha256) {
+      // Fallback: si no hay dni_sha256, mostramos como siempre por id_user
+      return await Turn.findAll({
+        where: { id_user: numericIdUser },
+        include: [{ model: Doctor }],
+        order: [["createdAt", "DESC"]],
+      });
+    }
+
+    // 2) Buscamos todos los pacientes presenciales asociados por dni_sha256
+    const patientRecords = await PresentialPatient.findAll({
+      where: { dni_sha256: u.dni_sha256 },
+      attributes: ["id_patient_record"],
+    });
+
+    const patientIds = patientRecords
+      .map((p) => p.id_patient_record)
+      .filter(Boolean);
+
+    // 3) Unimos ambos criterios: por id_user o por id_patient_record
+    const { Op } = await import("sequelize");
+
     return await Turn.findAll({
-      where: { id_user },
+      where: {
+        [Op.or]: [
+          { id_user: numericIdUser },
+          ...(patientIds.length ? [{ id_patient_record: patientIds[0] }] : []),
+        ],
+      },
       include: [{ model: Doctor }],
       order: [["createdAt", "DESC"]],
     });
@@ -163,7 +238,9 @@ export default function turnController() {
         { model: Doctor },
         {
           model: User,
-          attributes: ["id_user", "name", "surname", "user"],
+          // Agregamos nacionalidad para que el front pueda mostrarla
+          // cuando el turno fue pedido por usuario logueado.
+          attributes: ["id_user", "name", "surname", "user", "nacionalidad"],
         },
         { model: PresentialPatient },
       ],
@@ -194,27 +271,29 @@ export default function turnController() {
       throw err;
     }
 
-    const confirmedCount = await countConfirmedForDoctorOnDate({
+    const bookedCount = await countBookedForDoctorOnDate({
       id_doctor: t.id_doctor,
       date: t.date,
     });
 
-    // confirmedCount ya cuenta el turno confirmado actual; como el turno es PENDIENTE aún, no cuenta.
-    if (confirmedCount >= capacity.limit_turns) {
+    // bookedCount ya incluye este turno porque está PENDIENTE.
+    // Al confirmar no debería superar el límite; si está al tope, falla.
+    if (bookedCount > capacity.limit_turns - 1) {
       const err = new Error("Ya no hay cupos disponibles");
       err.statusCode = 400;
       throw err;
     }
 
     t.status = "CONFIRMADO";
-    t.confirmedAt = new Date();
-    t.confirmedBy = confirmedBy;
+    // confirmación: usamos updatedAt (timestamps) para la fecha,
+    // y guardamos quién lo hizo en modifiedBy.
+    t.modifiedBy = confirmedBy;
     await t.save();
 
     return t;
   }
 
-  async function cancelTurn(id_turn) {
+  async function cancelTurn(id_turn, modifiedBy) {
     const t = await Turn.findByPk(id_turn);
     if (!t) {
       const err = new Error("Turno no encontrado");
@@ -228,6 +307,9 @@ export default function turnController() {
     }
 
     t.status = "CANCELADO";
+    // cancelación: guardamos quién lo hizo en modifiedBy;
+    // la fecha se obtiene de updatedAt.
+    t.modifiedBy = modifiedBy;
     await t.save();
     return t;
   }

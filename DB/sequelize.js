@@ -54,7 +54,7 @@ export async function connect() {
     // Evita fallar si alguna tabla (ej: roles) no existe en la BD.
     // Como tu app depende de sync para recrear, usamos fuerza, pero si
     // MySQL se encuentra en estado inconsistente, esto evita romper el arranque.
-    await sequelize.sync({});
+    await sequelize.sync({ force: true });
     console.log("Tablas sincronizadas");
 
     // 🚀 --- CARGA DE DATOS INICIALES (SEEDERS) ---

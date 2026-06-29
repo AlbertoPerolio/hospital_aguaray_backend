@@ -13,15 +13,9 @@ const presentialPatient = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
-    dni_hash: {
+    dni: {
       type: DataTypes.STRING(255),
       allowNull: true,
-      unique: true,
-    },
-    telefono_hash: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-      unique: true,
     },
     telefono: {
       // Teléfono en texto plano para poder mostrarlo en frontend (no es reversible desde hashes)

@@ -1,29 +1,5 @@
 import { z } from "zod";
 
-export const registerSchema = z.object({
-  user: z
-    .string({ required_error: "Nombre de Usuario Requerido" })
-    .min(1, { message: "Nombre de Usuario Requerido" }),
-  email: z.string({ required_error: "Email requerido" }).email(),
-  password: z.string({ required_error: "Contraseña requerida" }).min(6, {
-    message: "La contraseña tiene que tener al menos 6 caracteres",
-  }),
-  name: z.string().optional(),
-  surname: z.string().optional(),
-  dni: z.string().optional(),
-  nacionalidad: z.string().optional(),
-  telefono: z.string().optional(),
-  securityQuestionId: z
-    .number({
-      required_error: "Debes seleccionar una pregunta de seguridad",
-    })
-    .min(1),
-  securityAnswer: z
-    .string({ required_error: "Debes responder a la pregunta de seguridad" })
-    .min(1, { message: "La respuesta no puede estar vacía" })
-    .transform((val) => val.toLowerCase().trim()),
-});
-
 export const updateUserSchema = z
   .object({
     name: z.string().min(1, { message: "Nombre no válido" }).optional(),
@@ -38,6 +14,11 @@ export const updateUserSchema = z
       .min(1, { message: "Nacionalidad inválida" })
       .optional(),
     telefono: z.string().min(1, { message: "Teléfono inválido" }).optional(),
+
+    fechaNacimiento: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Fecha inválida" })
+      .optional(),
 
     password: z
       .string()

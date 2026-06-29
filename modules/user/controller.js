@@ -87,6 +87,7 @@ export default function userController() {
     if (data.surname) fieldsToUpdate.surname = data.surname;
     if (data.user) fieldsToUpdate.user = data.user;
     if (data.email) fieldsToUpdate.email = data.email;
+    if (data.nacionalidad) fieldsToUpdate.nacionalidad = data.nacionalidad;
     if (data.securityQuestionId)
       fieldsToUpdate.securityQuestionId = data.securityQuestionId;
 
@@ -103,20 +104,20 @@ export default function userController() {
       fieldsToUpdate.password = await bcrypt.hash(data.password, salt);
     }
 
-    // Hashear DNI y teléfono si el usuario los envía desde su perfil.
+    // DNI y teléfono: guardar el valor real en campos visibles,
+    // y además guardar el hash solo para búsquedas/verificación.
     if (data.dni) {
-      const salt = await bcrypt.genSalt(10);
-      fieldsToUpdate.dni = await bcrypt.hash(data.dni.toString(), salt);
+      fieldsToUpdate.dni = data.dni.toString().trim();
       fieldsToUpdate.dni_sha256 = sha256(data.dni);
     }
 
     if (data.telefono) {
-      const salt = await bcrypt.genSalt(10);
-      fieldsToUpdate.telefono = await bcrypt.hash(
-        data.telefono.toString(),
-        salt,
-      );
+      fieldsToUpdate.telefono = data.telefono.toString().trim();
       fieldsToUpdate.telefono_sha256 = sha256(data.telefono);
+    }
+
+    if (data.fechaNacimiento) {
+      fieldsToUpdate.fechaNacimiento = data.fechaNacimiento;
     }
 
     await user.update(fieldsToUpdate);
@@ -143,18 +144,15 @@ export default function userController() {
     if (data.surname) fieldsToUpdate.surname = data.surname;
     if (data.nacionalidad) fieldsToUpdate.nacionalidad = data.nacionalidad;
 
+    // DNI y teléfono (admin): guardar valor real en campos visibles,
+    // y además guardar hash para búsquedas/verificación.
     if (data.dni) {
-      const salt = await bcrypt.genSalt(10);
-      fieldsToUpdate.dni = await bcrypt.hash(data.dni.toString(), salt);
+      fieldsToUpdate.dni = data.dni.toString().trim();
       fieldsToUpdate.dni_sha256 = sha256(data.dni);
     }
 
     if (data.telefono) {
-      const salt = await bcrypt.genSalt(10);
-      fieldsToUpdate.telefono = await bcrypt.hash(
-        data.telefono.toString(),
-        salt,
-      );
+      fieldsToUpdate.telefono = data.telefono.toString().trim();
       fieldsToUpdate.telefono_sha256 = sha256(data.telefono);
     }
 

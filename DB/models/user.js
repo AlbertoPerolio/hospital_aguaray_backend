@@ -19,11 +19,6 @@ const user = sequelize.define(
       allowNull: false,
       unique: true,
     },
-    password: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-    },
-
     name: {
       type: DataTypes.STRING(50),
       allowNull: true,
@@ -57,21 +52,14 @@ const user = sequelize.define(
       allowNull: true,
       unique: true,
     },
-
-    securityQuestionId: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-
-    securityAnswer: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-    },
-
     googleId: {
       type: DataTypes.STRING(100),
       allowNull: true,
       unique: true,
+    },
+    fechaNacimiento: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
     },
     id_role: {
       type: DataTypes.INTEGER,

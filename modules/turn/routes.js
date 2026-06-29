@@ -27,20 +27,17 @@ router.post(
 
       // Regla paciente: solo puede pedir para el día de hoy
       if (req.user.id_role === ROLES.USER) {
-        // Fecha “hoy” en Argentina (ART = UTC-3). Evita problemas de zona horaria en el hosting.
-        const now = new Date();
-        const utcMs = now.getTime() + now.getTimezoneOffset() * 60000; // a UTC
-        const artMs = utcMs - 3 * 60 * 60 * 1000; // UTC-3
-        const artDate = new Date(artMs);
+        // Fecha “hoy” en Argentina (ART = UTC-3).
+        // Usamos toLocaleDateString en vez de cálculos manuales para evitar desfases por zona horaria.
+        const normalizedDate = (date || "").toString().trim();
 
-        const yyyy = artDate.getUTCFullYear();
-        const mm = String(artDate.getUTCMonth() + 1).padStart(2, "0");
-        const dd = String(artDate.getUTCDate()).padStart(2, "0");
-        const todayStr = `${yyyy}-${mm}-${dd}`;
+        const todayStr = new Date().toLocaleDateString("sv-SE", {
+          timeZone: "America/Argentina/Buenos_Aires",
+        });
 
-        if (date !== todayStr) {
+        if (normalizedDate !== todayStr) {
           const err = new Error(
-            "Los pacientes solo pueden pedir turno para hoy",
+            `Solo se pueden pedir turno para el mismo dia.`,
           );
           err.statusCode = 400;
           throw err;
@@ -133,7 +130,10 @@ router.put(
   checkRole([ROLES.ADMIN, ROLES.SECRETARY]),
   async (req, res, next) => {
     try {
-      const updated = await ctrl.cancelTurn(parseInt(req.params.id_turn, 10));
+      const updated = await ctrl.cancelTurn(
+        parseInt(req.params.id_turn, 10),
+        req.user.id_user,
+      );
       return res.json({ error: false, body: updated });
     } catch (err) {
       next(err);
