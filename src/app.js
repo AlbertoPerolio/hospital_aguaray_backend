@@ -31,7 +31,7 @@ await connect();
 const app = express();
 
 //config CORS
-const allowedOrigins = ["https://hospital-aguaray.vercel.app/"];
+const allowedOrigins = ["https://hospital-aguaray.vercel.app"];
 app.use(
   cors({
     origin: function (origin, callback) {
