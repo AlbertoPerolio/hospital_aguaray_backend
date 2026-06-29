@@ -31,7 +31,7 @@ await connect();
 const app = express();
 
 //config CORS
-const allowedOrigins = ["http://localhost:5173"];
+const allowedOrigins = ["https://hospital-aguaray.vercel.app/"];
 app.use(
   cors({
     origin: function (origin, callback) {
