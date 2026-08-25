@@ -88,15 +88,22 @@ router.get(
   },
 );
 
-// Historial (secretario/admin)
+// Historial con filtros y paginación (secretario/admin)
 router.get(
   "/history",
   verifyJWT,
   checkRole([ROLES.ADMIN, ROLES.SECRETARY]),
   async (req, res, next) => {
     try {
-      const status = req.query.status || "ALL";
-      const list = await ctrl.allTurnsWithFilter({ status });
+      const { status, date, id_doctor, search, page, limit } = req.query;
+      const list = await ctrl.allTurnsWithFilter({
+        status,
+        date,
+        id_doctor,
+        search,
+        page,
+        limit,
+      });
       return res.json({ error: false, body: list });
     } catch (err) {
       next(err);

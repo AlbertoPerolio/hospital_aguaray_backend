@@ -1,9 +1,33 @@
 import Doctor from "../../DB/models/doctor.js";
 import DoctorDailyCapacity from "../../DB/models/doctor_daily_capacity.js";
+import { Op } from "sequelize";
 
 export default function doctorController() {
-  // CRUD Básico
-  async function listAll(date) {
+  // CRUD Básico con filtros
+  async function listAll(params = {}) {
+    // Soportar tanto listAll("2026-08-22") como listAll({ date, search, specialty, activo })
+    const { date, search, specialty, activo } =
+      typeof params === "string" ? { date: params } : params || {};
+
+    const where = {};
+
+    if (activo !== undefined && activo !== "" && activo !== "ALL") {
+      where.activo = activo === true || activo === "true";
+    }
+
+    if (specialty && specialty.trim()) {
+      where.specialty = { [Op.iLike]: `%${specialty.trim()}%` };
+    }
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      where[Op.or] = [
+        { name: { [Op.iLike]: term } },
+        { surname: { [Op.iLike]: term } },
+        { specialty: { [Op.iLike]: term } },
+      ];
+    }
+
     const include = [];
     if (date) {
       include.push({
@@ -12,7 +36,15 @@ export default function doctorController() {
         required: false, // LEFT JOIN para traer todos los doctores aunque no tengan capacidad seteada
       });
     }
-    return await Doctor.findAll({ include });
+
+    return await Doctor.findAll({
+      where,
+      include,
+      order: [
+        ["surname", "ASC"],
+        ["name", "ASC"],
+      ],
+    });
   }
 
   async function createDoctor(data) {

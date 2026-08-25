@@ -37,15 +37,16 @@ router.put(
   },
 );
 
-// Listar todos los usuarios (GET /api/user-management/admin/all)
+// Listar todos los usuarios con filtros y paginación (GET /api/user-management/admin/all)
 router.get(
   "/admin/all",
   verifyJWT,
   checkRole([ROLES.ADMIN, ROLES.SECRETARY]),
   async (req, res, next) => {
     try {
-      const users = await ctrl.getAllUsers();
-      return answers.success(req, res, users, 200);
+      const { search, id_role, page, limit } = req.query;
+      const result = await ctrl.getAllUsers({ search, id_role, page, limit });
+      return answers.success(req, res, result, 200);
     } catch (err) {
       next(err);
     }

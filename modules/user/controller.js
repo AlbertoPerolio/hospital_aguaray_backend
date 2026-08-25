@@ -1,6 +1,7 @@
 import UserModel from "../../DB/models/user.js";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import { Op } from "sequelize";
 
 function sha256(value) {
   if (value === null || value === undefined) return null;
@@ -164,14 +165,55 @@ export default function userController() {
     return updatedUser;
   }
 
-  // 3. Listar todos los usuarios del sistema (Admin/Secretario)
-  async function getAllUsers() {
-    return await UserModel.findAll({
+  // 3. Listar todos los usuarios del sistema con filtros y paginación (Admin/Secretario)
+  async function getAllUsers({ search, id_role, page = 1, limit = 10 } = {}) {
+    const where = {};
+
+    if (id_role) {
+      where.id_role = Number(id_role);
+    }
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      const cleanDigits = search.replace(/\D/g, "");
+      const orConditions = [
+        { name: { [Op.iLike]: term } },
+        { surname: { [Op.iLike]: term } },
+        { user: { [Op.iLike]: term } },
+        { email: { [Op.iLike]: term } },
+      ];
+
+      if (cleanDigits.length > 0) {
+        orConditions.push({ dni: { [Op.iLike]: `%${cleanDigits}%` } });
+        orConditions.push({ telefono: { [Op.iLike]: `%${cleanDigits}%` } });
+        orConditions.push({ dni_sha256: sha256(cleanDigits) });
+        orConditions.push({ telefono_sha256: sha256(cleanDigits) });
+      }
+
+      where[Op.or] = orConditions;
+    }
+
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.max(1, parseInt(limit, 10) || 10);
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    const { rows, count } = await UserModel.findAndCountAll({
+      where,
       attributes: {
         exclude: ["password", "securityAnswer", "securityQuestionId"],
       },
       order: [["id_user", "ASC"]],
+      limit: parsedLimit,
+      offset,
     });
+
+    return {
+      users: rows,
+      total: count,
+      page: parsedPage,
+      limit: parsedLimit,
+      totalPages: Math.ceil(count / parsedLimit) || 1,
+    };
   }
 
   // 3.b Buscar usuarios por DNI o Teléfono (Admin/Secretario)

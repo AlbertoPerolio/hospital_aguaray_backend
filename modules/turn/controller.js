@@ -3,6 +3,7 @@ import Doctor from "../../DB/models/doctor.js";
 import DoctorDailyCapacity from "../../DB/models/doctor_daily_capacity.js";
 import User from "../../DB/models/user.js";
 import PresentialPatient from "../../DB/models/presential_patient.js";
+import { Op } from "sequelize";
 
 export default function turnController() {
   async function countBookedForDoctorOnDate({ id_doctor, date }) {
@@ -96,8 +97,6 @@ export default function turnController() {
       // Para equivalencia:
       // - si hay id_user derivado, usamos esos id_user
       // - si hay id_patient_record, usamos ese id_patient_record
-
-      const { Op } = await import("sequelize");
 
       // Si el request llega ya con id_user (login con cuenta creada),
       // pero el turno previo se guardó con id_patient_record (sin cuenta),
@@ -199,8 +198,6 @@ export default function turnController() {
       .filter(Boolean);
 
     // 3) Unimos ambos criterios: por id_user o por id_patient_record
-    const { Op } = await import("sequelize");
-
     return await Turn.findAll({
       where: {
         [Op.or]: [
@@ -228,24 +225,98 @@ export default function turnController() {
     });
   }
 
-  async function allTurnsWithFilter({ status }) {
+  async function allTurnsWithFilter({
+    status,
+    date,
+    id_doctor,
+    search,
+    page = 1,
+    limit = 10,
+  } = {}) {
     const where = {};
     if (status && status !== "ALL") where.status = status;
+    if (date && date.trim()) where.date = date.trim();
+    if (id_doctor) where.id_doctor = Number(id_doctor);
 
-    return await Turn.findAll({
-      where,
-      include: [
-        { model: Doctor },
-        {
-          model: User,
-          // Agregamos nacionalidad para que el front pueda mostrarla
-          // cuando el turno fue pedido por usuario logueado.
-          attributes: ["id_user", "name", "surname", "user", "nacionalidad"],
-        },
-        { model: PresentialPatient },
+    const userInclude = {
+      model: User,
+      attributes: [
+        "id_user",
+        "name",
+        "surname",
+        "user",
+        "nacionalidad",
+        "dni",
+        "telefono",
       ],
+      required: false,
+    };
+
+    const patientInclude = {
+      model: PresentialPatient,
+      attributes: [
+        "id_patient_record",
+        "first_name",
+        "last_name",
+        "nacionalidad",
+        "dni",
+        "telefono",
+      ],
+      required: false,
+    };
+
+    const doctorInclude = {
+      model: Doctor,
+      attributes: ["id_doctor", "name", "surname", "specialty", "activo"],
+      required: false,
+    };
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      const cleanDigits = search.replace(/\D/g, "");
+
+      const orSearch = [
+        { "$user.name$": { [Op.iLike]: term } },
+        { "$user.surname$": { [Op.iLike]: term } },
+        { "$user.user$": { [Op.iLike]: term } },
+        { "$user.email$": { [Op.iLike]: term } },
+        { "$presential_patient.first_name$": { [Op.iLike]: term } },
+        { "$presential_patient.last_name$": { [Op.iLike]: term } },
+        { "$doctor.name$": { [Op.iLike]: term } },
+        { "$doctor.surname$": { [Op.iLike]: term } },
+        { "$doctor.specialty$": { [Op.iLike]: term } },
+      ];
+
+      if (cleanDigits.length > 0) {
+        orSearch.push({ "$user.dni$": { [Op.iLike]: `%${cleanDigits}%` } });
+        orSearch.push({
+          "$presential_patient.dni$": { [Op.iLike]: `%${cleanDigits}%` },
+        });
+      }
+
+      where[Op.or] = orSearch;
+    }
+
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.max(1, parseInt(limit, 10) || 10);
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    const { rows, count } = await Turn.findAndCountAll({
+      where,
+      include: [doctorInclude, userInclude, patientInclude],
       order: [["createdAt", "DESC"]],
+      limit: parsedLimit,
+      offset,
+      distinct: true,
     });
+
+    return {
+      turns: rows,
+      total: count,
+      page: parsedPage,
+      limit: parsedLimit,
+      totalPages: Math.ceil(count / parsedLimit) || 1,
+    };
   }
 
   async function confirmTurn(id_turn, confirmedBy) {
