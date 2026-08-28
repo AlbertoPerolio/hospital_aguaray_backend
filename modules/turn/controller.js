@@ -347,9 +347,10 @@ export default function turnController() {
       date: t.date,
     });
 
-    // bookedCount ya incluye este turno porque está PENDIENTE.
-    // Al confirmar no debería superar el límite; si está al tope, falla.
-    if (bookedCount > capacity.limit_turns - 1) {
+    // bookedCount ya incluye este turno porque está PENDIENTE: confirmar no
+    // consume un cupo nuevo. Solo fallamos si de verdad hay sobre-venta
+    // (más reservas que el límite), lo que permite confirmar el último cupo.
+    if (bookedCount > capacity.limit_turns) {
       const err = new Error("Ya no hay cupos disponibles");
       err.statusCode = 400;
       throw err;

@@ -1,15 +1,11 @@
+// ⚠️ MÓDULO DEPRECADO / NO MONTADO.
+// Ver modules/register/routes.js. El registro local usa columnas
+// (password/security*) que ya no existen en el modelo `user`; el acceso real
+// es solo con Google.
 import bcrypt from "bcrypt";
 import UserModel from "../../DB/models/user.js"; // Cambiado para evitar conflictos de nombres
 import { ROLES } from "../../middleware/role.middleware.js";
-import crypto from "crypto";
-
-function sha256(value) {
-  if (value === null || value === undefined) return null;
-  return crypto
-    .createHash("sha256")
-    .update(String(value).trim().toLowerCase())
-    .digest("hex");
-}
+import { sha256 } from "../../utils/sha256.js";
 
 export default function registerController() {
   // Función 1: Crear usuario / Registro (add)

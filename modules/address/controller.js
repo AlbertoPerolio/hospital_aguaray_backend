@@ -13,6 +13,7 @@ export default function addressController() {
       apartment: data.apartment || null,
       postalCode: data.postalCode,
       city: data.city,
+      barrio: data.barrio,
       province: data.province,
       description: data.description || null,
     };

@@ -23,8 +23,7 @@ export const verifyJWT = async (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         error: true,
-        mensaje:
-          "Acceso denegado. ¿Que haces viendo aquí bro? ¿Te gano la curiosidad?.",
+        mensaje: "Acceso denegado. Se requiere autenticación.",
       });
     }
 

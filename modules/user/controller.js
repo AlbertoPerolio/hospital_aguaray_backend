@@ -1,24 +1,12 @@
 import UserModel from "../../DB/models/user.js";
-import bcrypt from "bcrypt";
-import crypto from "crypto";
+import AddressModel from "../../DB/models/address.js";
 import { Op } from "sequelize";
-
-function sha256(value) {
-  if (value === null || value === undefined) return null;
-  return crypto
-    .createHash("sha256")
-    .update(String(value).trim().toLowerCase())
-    .digest("hex");
-}
+import { sha256 } from "../../utils/sha256.js";
 
 export default function userController() {
   // 1. Obtener datos del usuario actual (Mi Perfil)
   async function getProfile(userId) {
-    const user = await UserModel.findByPk(userId, {
-      attributes: {
-        exclude: ["password", "securityAnswer", "securityQuestionId"],
-      },
-    });
+    const user = await UserModel.findByPk(userId);
 
     if (!user) {
       const error = new Error("Usuario no encontrado");
@@ -26,10 +14,16 @@ export default function userController() {
       throw error;
     }
 
-    return user;
+    const addresses = await AddressModel.findAll({
+      where: { id_user: userId },
+      order: [["createdAt", "DESC"]],
+    });
+
+    return { ...user.toJSON(), addresses };
   }
 
   // 2. Actualizar datos del perfil propio
+  //    (El login es solo con Google: no hay contraseña ni pregunta de seguridad)
   async function updateProfile(userId, data) {
     const user = await UserModel.findByPk(userId);
     if (!user) {
@@ -38,72 +32,12 @@ export default function userController() {
       throw error;
     }
 
-    // 🔐 Si quiere cambiar contraseña, verificar actual
-    if (data.password) {
-      const isPasswordValid = await bcrypt.compare(
-        data.currentPassword,
-        user.password,
-      );
-
-      if (!isPasswordValid) {
-        const error = new Error(
-          "La contraseña actual ingresada es incorrecta.",
-        );
-        error.statusCode = 400;
-        throw error;
-      }
-    }
-
-    // 🔐 Si quiere cambiar seguridad, verificar respuesta actual
-    if (data.securityAnswer) {
-      if (!data.currentSecurityAnswer) {
-        const error = new Error(
-          "Si cambia la respuesta de seguridad, debe ingresar la respuesta actual.",
-        );
-        error.statusCode = 400;
-        throw error;
-      }
-
-      const normalizedCurrentAnswer = data.currentSecurityAnswer
-        .toString()
-        .toLowerCase()
-        .trim();
-
-      const isAnswerMatch = await bcrypt.compare(
-        normalizedCurrentAnswer,
-        user.securityAnswer,
-      );
-
-      if (!isAnswerMatch) {
-        const error = new Error(
-          "La respuesta de seguridad actual es incorrecta.",
-        );
-        error.statusCode = 400;
-        throw error;
-      }
-    }
-
     const fieldsToUpdate = {};
     if (data.name) fieldsToUpdate.name = data.name;
     if (data.surname) fieldsToUpdate.surname = data.surname;
     if (data.user) fieldsToUpdate.user = data.user;
     if (data.email) fieldsToUpdate.email = data.email;
     if (data.nacionalidad) fieldsToUpdate.nacionalidad = data.nacionalidad;
-    if (data.securityQuestionId)
-      fieldsToUpdate.securityQuestionId = data.securityQuestionId;
-
-    if (data.securityAnswer) {
-      const salt = await bcrypt.genSalt(10);
-      fieldsToUpdate.securityAnswer = await bcrypt.hash(
-        data.securityAnswer.toLowerCase().trim(),
-        salt,
-      );
-    }
-
-    if (data.password) {
-      const salt = await bcrypt.genSalt(10);
-      fieldsToUpdate.password = await bcrypt.hash(data.password, salt);
-    }
 
     // DNI y teléfono: guardar el valor real en campos visibles,
     // y además guardar el hash solo para búsquedas/verificación.
@@ -123,11 +57,12 @@ export default function userController() {
 
     await user.update(fieldsToUpdate);
 
-    const updatedUser = user.toJSON();
+    const addresses = await AddressModel.findAll({
+      where: { id_user: userId },
+      order: [["createdAt", "DESC"]],
+    });
 
-    delete updatedUser.password;
-    delete updatedUser.securityAnswer;
-    return updatedUser;
+    return { ...user.toJSON(), addresses };
   }
 
   // 2.5 Actualizar datos de usuario ajeno (Admin/Secretario)
@@ -159,10 +94,7 @@ export default function userController() {
 
     await target.update(fieldsToUpdate);
 
-    const updatedUser = target.toJSON();
-    delete updatedUser.password;
-    delete updatedUser.securityAnswer;
-    return updatedUser;
+    return target.toJSON();
   }
 
   // 3. Listar todos los usuarios del sistema con filtros y paginación (Admin/Secretario)
@@ -199,9 +131,6 @@ export default function userController() {
 
     const { rows, count } = await UserModel.findAndCountAll({
       where,
-      attributes: {
-        exclude: ["password", "securityAnswer", "securityQuestionId"],
-      },
       order: [["id_user", "ASC"]],
       limit: parsedLimit,
       offset,
@@ -226,9 +155,6 @@ export default function userController() {
 
     return await UserModel.findAll({
       where,
-      attributes: {
-        exclude: ["password", "securityAnswer", "securityQuestionId"],
-      },
       limit: 5,
     });
   }

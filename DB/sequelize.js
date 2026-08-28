@@ -57,6 +57,13 @@ export async function connect() {
     await sequelize.sync({});
     console.log("Tablas sincronizadas");
 
+    // Migración liviana: agrega columnas nuevas de forma idempotente.
+    // No usamos sync({ alter: true }) porque rompe con las claves foráneas
+    // existentes (bug de Sequelize con "SET DEFAULT ... REFERENCES").
+    await sequelize.query(
+      `ALTER TABLE "address" ADD COLUMN IF NOT EXISTS "barrio" VARCHAR(100);`,
+    );
+
     // 🚀 --- CARGA DE DATOS INICIALES (SEEDERS) ---
     console.log("Cargando roles y permisos iniciales...");
 
@@ -107,6 +114,8 @@ export async function connect() {
     console.log("¡Roles, permisos y relaciones inicializadas con éxito!");
   } catch (error) {
     console.error("Error al conectar o sincronizar PostgreSQL:", error);
+    // Fallar rápido: sin base de datos, el servidor no debería arrancar.
+    throw error;
   }
 }
 

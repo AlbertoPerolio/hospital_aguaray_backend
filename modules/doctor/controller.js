@@ -1,5 +1,6 @@
 import Doctor from "../../DB/models/doctor.js";
 import DoctorDailyCapacity from "../../DB/models/doctor_daily_capacity.js";
+import Turn from "../../DB/models/turn.js";
 import { Op } from "sequelize";
 
 export default function doctorController() {
@@ -53,13 +54,33 @@ export default function doctorController() {
 
   async function deleteDoctor(id) {
     const doc = await Doctor.findByPk(id);
-    if (!doc) throw new Error("Doctor no encontrado");
+    if (!doc) {
+      const error = new Error("Doctor no encontrado");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Evitamos borrar en cascada el historial de turnos: si tiene turnos,
+    // pedimos que lo pausen en lugar de eliminarlo.
+    const turnsCount = await Turn.count({ where: { id_doctor: id } });
+    if (turnsCount > 0) {
+      const error = new Error(
+        "No se puede eliminar un médico con turnos asociados. Pausalo en su lugar.",
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
     return await doc.destroy();
   }
 
   async function setActivo(id, status) {
     const doc = await Doctor.findByPk(id);
-    if (!doc) throw new Error("Doctor no encontrado");
+    if (!doc) {
+      const error = new Error("Doctor no encontrado");
+      error.statusCode = 404;
+      throw error;
+    }
     return await doc.update({ activo: status });
   }
 

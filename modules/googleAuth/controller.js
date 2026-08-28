@@ -66,9 +66,25 @@ export default function googleAuthController() {
         username = `${usernameBase}${i}`;
       }
 
-      // Si es el primer usuario del sistema, lo marcamos como ADMIN
+      // Bootstrap de administrador: solo se promueve a ADMIN si el email está
+      // en ADMIN_EMAILS (csv). Si esa variable no está configurada, mantenemos
+      // el comportamiento histórico (primer usuario = ADMIN) para no dejar el
+      // sistema sin administrador durante el desarrollo.
+      const adminEmails = (process.env.ADMIN_EMAILS || "")
+        .split(",")
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+
       const userCount = await UserModel.count();
-      const id_role = userCount === 0 ? 3 : 1; // ADMIN=3, CLIENT=1
+      const normalizedEmail = (email || "").toLowerCase();
+      const id_role =
+        adminEmails.length > 0
+          ? adminEmails.includes(normalizedEmail)
+            ? 3
+            : 1
+          : userCount === 0
+            ? 3
+            : 1; // ADMIN=3, CLIENT=1
 
       const created = await UserModel.create({
         googleId,
@@ -77,9 +93,6 @@ export default function googleAuthController() {
         name: parsedName || null,
         surname: parsedSurname || null,
 
-        password: null,
-        securityQuestionId: null,
-        securityAnswer: null,
         id_role,
       });
 
@@ -95,7 +108,10 @@ export default function googleAuthController() {
       }
     }
 
-    return assignToken(user.toJSON());
+    return {
+      token: assignToken(user),
+      user: user.toJSON(),
+    };
   }
 
   return { googleLoginOrSignup };

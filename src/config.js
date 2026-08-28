@@ -12,7 +12,7 @@ const config = {
     user: process.env.Base_USER || "wakawaka",
     password: process.env.Base_PASSWORD || "",
     database: process.env.Base_DB || "ninguna",
-    port: process.env.Base_PORT || 3306,
+    port: process.env.Base_PORT || 5432,
     dialect: process.env.Base_DIALECT || "AAA",
   },
   cloudinary: {

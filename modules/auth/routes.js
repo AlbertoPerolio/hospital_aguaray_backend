@@ -1,5 +1,4 @@
 import express from "express";
-import controller from "./index.js";
 import { validateSchema } from "../../middleware/validator.middleware.js";
 import jwt from "jsonwebtoken";
 import config from "../../src/config.js";
@@ -81,10 +80,10 @@ router.post("/logout", (req, res) => {
   const isProduction = process.env.NODE_ENV === "production";
   res.cookie("token", "", {
     httpOnly: true,
-    secure: true,
-    sameSite: "none",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     expires: new Date(0),
-  }); // Expira inmediatamente });
+  });
   res.json({ mensaje: "Logout exitoso" });
 });
 

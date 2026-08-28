@@ -1,6 +1,8 @@
 import express from "express";
 import { verifyJWT } from "../../middleware/auth.middleware.js";
 import { checkRole, ROLES } from "../../middleware/role.middleware.js";
+import { validateSchema } from "../../middleware/validator.middleware.js";
+import { requestTurnSchema } from "../../schema/turn.schema.js";
 import turnController from "./controller.js";
 import {
   turnRateLimiter,
@@ -16,14 +18,16 @@ router.post(
   turnRateLimiter,
   verifyJWT,
   checkRole([ROLES.USER, ROLES.ADMIN, ROLES.SECRETARY]),
+  validateSchema(requestTurnSchema),
   async (req, res, next) => {
     try {
       const { id_doctor, date, id_user, id_patient_record } = req.body;
 
-      // Si es un usuario común, solo puede pedir para sí mismo.
+      // Si es un usuario común, solo puede pedir para sí mismo (y no puede
+      // vincular un id_patient_record ajeno).
       // Si es Staff, puede usar los IDs enviados en el body.
-      const targetUser =
-        req.user.id_role === ROLES.USER ? req.user.id_user : id_user;
+      const isRegularUser = req.user.id_role === ROLES.USER;
+      const targetUser = isRegularUser ? req.user.id_user : id_user;
 
       // Regla paciente: solo puede pedir para el día de hoy
       if (req.user.id_role === ROLES.USER) {
@@ -48,7 +52,7 @@ router.post(
         id_doctor: parseInt(id_doctor, 10),
         date,
         id_user: targetUser,
-        id_patient_record: id_patient_record || null,
+        id_patient_record: isRegularUser ? null : id_patient_record || null,
       });
 
       return res.json({ error: false, body: created });

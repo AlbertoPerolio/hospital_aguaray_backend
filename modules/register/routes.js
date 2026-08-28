@@ -1,3 +1,8 @@
+// ⚠️ MÓDULO DEPRECADO / NO MONTADO.
+// Este módulo NO se importa en src/app.js. El registro de usuarios es
+// exclusivamente con Google (ver modules/googleAuth). El modelo `user` ya no
+// tiene columnas de contraseña ni pregunta de seguridad, por lo que el
+// registro local no es funcional.
 import express from "express";
 import { verifyJWT } from "../../middleware/auth.middleware.js";
 import {

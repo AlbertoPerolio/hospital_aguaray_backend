@@ -1,14 +1,5 @@
-import bcrypt from "bcrypt";
 import PresentialPatient from "../../DB/models/presential_patient.js";
-import crypto from "crypto";
-
-function sha256(value) {
-  if (value === null || value === undefined) return null;
-  return crypto
-    .createHash("sha256")
-    .update(String(value).replace(/\D/g, "").trim())
-    .digest("hex");
-}
+import { sha256 } from "../../utils/sha256.js";
 
 export default function patientController() {
   // Busca pacientes presenciales por hash determinístico (SHA-256)

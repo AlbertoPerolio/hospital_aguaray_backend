@@ -1,15 +1,20 @@
 import express from "express";
 import { verifyJWT } from "../../middleware/auth.middleware.js";
 import { checkRole, ROLES } from "../../middleware/role.middleware.js";
+import { validateSchema } from "../../middleware/validator.middleware.js";
+import {
+  createDoctorSchema,
+  dailyCapacitySchema,
+} from "../../schema/doctor.schema.js";
 import doctorController from "./controller.js";
 
 const router = express.Router();
 const ctrl = doctorController();
 
-// Público: listar doctores
+// Público: listar doctores con filtros opcionales
 router.get("/", async (req, res, next) => {
   try {
-    const list = await ctrl.listAll();
+    const list = await ctrl.listAll(req.query);
     return res.json({ error: false, body: list });
   } catch (err) {
     next(err);
@@ -21,6 +26,7 @@ router.post(
   "/",
   verifyJWT,
   checkRole([ROLES.ADMIN, ROLES.SECRETARY]),
+  validateSchema(createDoctorSchema),
   async (req, res, next) => {
     try {
       const created = await ctrl.createDoctor(req.body);
@@ -86,6 +92,7 @@ router.put(
   "/daily-capacity",
   verifyJWT,
   checkRole([ROLES.ADMIN, ROLES.SECRETARY]),
+  validateSchema(dailyCapacitySchema),
   async (req, res, next) => {
     try {
       const { date, rows } = req.body; // rows: [{id_doctor, enabled, limit_turns}]

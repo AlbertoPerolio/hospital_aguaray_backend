@@ -40,6 +40,11 @@ export const createAddressSchema = z.object({
     .min(2, { message: "La provincia debe tener al menos 2 caracteres" })
     .max(100, { message: "La provincia no puede superar los 100 caracteres" }),
 
+  barrio: z
+    .string({ required_error: "El barrio es requerido" })
+    .min(2, { message: "El barrio debe tener al menos 2 caracteres" })
+    .max(100, { message: "El barrio no puede superar los 100 caracteres" }),
+
   description: z
     .string()
     .max(150, { message: "La descripción no puede superar los 150 caracteres" })

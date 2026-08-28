@@ -38,7 +38,9 @@ app.use(
       if (!origin) return callback(null, true);
       if (allowedOrigins.indexOf(origin) === -1) {
         const msg = `La política de CORS no permite el acceso desde este origen: ${origin}`;
-        return callback(new Error(msg), false);
+        const err = new Error(msg);
+        err.statusCode = 403;
+        return callback(err);
       }
       return callback(null, true);
     },
@@ -47,8 +49,8 @@ app.use(
 );
 
 app.use(morgan("dev"));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser());
 
 const httpServer = createServer(app);
