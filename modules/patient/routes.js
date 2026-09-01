@@ -1,6 +1,8 @@
 import express from "express";
 import { verifyJWT } from "../../middleware/auth.middleware.js";
 import { checkRole, ROLES } from "../../middleware/role.middleware.js";
+import { validateSchema } from "../../middleware/validator.middleware.js";
+import { upsertPatientSchema } from "../../schema/patient.schema.js";
 import patientController from "./controller.js";
 
 const router = express.Router();
@@ -27,6 +29,7 @@ router.post(
   "/upsert",
   verifyJWT,
   checkRole([ROLES.ADMIN, ROLES.SECRETARY]),
+  validateSchema(upsertPatientSchema),
   async (req, res, next) => {
     try {
       const created = await ctrl.upsertPatient(req.body, req.user.id_user);

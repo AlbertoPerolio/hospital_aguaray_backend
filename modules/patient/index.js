@@ -1,3 +1,4 @@
 import router from "./routes.js";
 
-export default router;
+const controller = router();
+export default controller;

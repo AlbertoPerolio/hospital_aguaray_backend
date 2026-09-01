@@ -64,6 +64,10 @@ export async function connect() {
       `ALTER TABLE "address" ADD COLUMN IF NOT EXISTS "barrio" VARCHAR(100);`,
     );
 
+    await sequelize.query(
+      `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "noDomicilioArgentina" BOOLEAN DEFAULT false;`,
+    );
+
     // 🚀 --- CARGA DE DATOS INICIALES (SEEDERS) ---
     console.log("Cargando roles y permisos iniciales...");
 

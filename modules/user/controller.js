@@ -55,6 +55,10 @@ export default function userController() {
       fieldsToUpdate.fechaNacimiento = data.fechaNacimiento;
     }
 
+    if (typeof data.noDomicilioArgentina === "boolean") {
+      fieldsToUpdate.noDomicilioArgentina = data.noDomicilioArgentina;
+    }
+
     await user.update(fieldsToUpdate);
 
     const addresses = await AddressModel.findAll({
@@ -90,6 +94,10 @@ export default function userController() {
     if (data.telefono) {
       fieldsToUpdate.telefono = data.telefono.toString().trim();
       fieldsToUpdate.telefono_sha256 = sha256(data.telefono);
+    }
+
+    if (typeof data.noDomicilioArgentina === "boolean") {
+      fieldsToUpdate.noDomicilioArgentina = data.noDomicilioArgentina;
     }
 
     await target.update(fieldsToUpdate);
@@ -150,8 +158,17 @@ export default function userController() {
     if (!dni && !telefono) return [];
 
     const where = {};
-    if (dni) where.dni_sha256 = sha256(dni);
-    else if (telefono) where.telefono_sha256 = sha256(telefono);
+    if (dni) {
+      const dniHash = sha256(dni);
+      // Si el DNI no tiene dígitos (ej: "a"), no debe matchear registros con
+      // dni_sha256 NULL; devolvemos vacío.
+      if (!dniHash) return [];
+      where.dni_sha256 = dniHash;
+    } else if (telefono) {
+      const telefonoHash = sha256(telefono);
+      if (!telefonoHash) return [];
+      where.telefono_sha256 = telefonoHash;
+    }
 
     return await UserModel.findAll({
       where,

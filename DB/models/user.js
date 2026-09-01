@@ -61,6 +61,12 @@ const user = sequelize.define(
       type: DataTypes.DATEONLY,
       allowNull: true,
     },
+    // Persona sin domicilio en Argentina (extranjera): exime de cargar dirección.
+    noDomicilioArgentina: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
+    },
     id_role: {
       type: DataTypes.INTEGER,
       allowNull: false,

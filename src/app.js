@@ -14,6 +14,7 @@ import googleAuth from "../modules/googleAuth/routes.js";
 import doctorRoutes from "../modules/doctor/routes.js";
 import turnRoutes from "../modules/turn/routes.js";
 import patientRoutes from "../modules/patient/routes.js";
+import statsRoutes from "../modules/stats/routes.js";
 
 // imp errors
 import errors from "../errors/errors.js";
@@ -31,7 +32,7 @@ await connect();
 const app = express();
 
 //config CORS
-const allowedOrigins = ["https://hospital-aguaray.vercel.app"];
+const allowedOrigins = ["http://localhost:5173"];
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -84,6 +85,7 @@ app.use("/api/address", address);
 app.use("/api/doctor", doctorRoutes);
 app.use("/api/turn", turnRoutes);
 app.use("/api/patient", patientRoutes);
+app.use("/api/stats", statsRoutes);
 
 //errores
 app.use(errors);

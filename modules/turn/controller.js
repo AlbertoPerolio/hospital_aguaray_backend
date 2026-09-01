@@ -310,8 +310,34 @@ export default function turnController() {
       distinct: true,
     });
 
+    // modifiedBy guarda el id_user de quien confirmó/canceló. Resolvemos el
+    // nombre para mostrarlo en el historial sin exponer solo el ID.
+    const modifierIds = [
+      ...new Set(rows.map((t) => t.modifiedBy).filter((id) => id != null)),
+    ];
+    const modifiers = modifierIds.length
+      ? await User.findAll({
+          where: { id_user: modifierIds },
+          attributes: ["id_user", "name", "surname", "user"],
+        })
+      : [];
+    const modifierMap = new Map(modifiers.map((m) => [m.id_user, m]));
+
+    const turns = rows.map((t) => {
+      const plain = t.toJSON ? t.toJSON() : t;
+      const modifier = plain.modifiedBy
+        ? modifierMap.get(plain.modifiedBy)
+        : null;
+      const fullName = modifier
+        ? [modifier.surname, modifier.name].filter(Boolean).join(", ") ||
+          modifier.user ||
+          null
+        : null;
+      return { ...plain, modifiedByName: fullName };
+    });
+
     return {
-      turns: rows,
+      turns,
       total: count,
       page: parsedPage,
       limit: parsedLimit,
